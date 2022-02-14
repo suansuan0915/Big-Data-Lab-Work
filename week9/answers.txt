@@ -1,0 +1,164 @@
+				Answers_Assignment 9
+									Wanyi Su
+								      # 301445656
+
+
+Question 1.
+
+
+a. Answer:
+
+The query result is like:
+payment_method      average_amount
+credit                131.4007
+debit                 101.0695
+
+According to the result of average purchase amounts by credit and debit payment, although Ontario people tend to put larger purchases on credit purchase than debit purchase, the two purchase methods don't differ too much.
+
+
+b. Query:
+
+SELECT p2.mtype AS payment_method, SUM(p1.amount)/COUNT(c.custid) AS average_amount
+FROM purchases p1 JOIN paymentmethods p2
+	ON p1.pmid = p2.pmid
+    	JOIN customers c
+    	ON p2.custid = c.custid
+WHERE c.province = 'ON'
+GROUP BY p2.mtype;
+
+
+
+Question 2.
+
+a. Answer:
+
+The query result is like:
+from_bc_non_van      from_van     count     average     median
+false                 true        10384     86.0149     27.370
+true                  false        3899     95.1654     30.080
+false                 false       15717     112.8945    33.270
+
+Since there are three groups of people, we can define three set of conditions for "from_bc_non_van" and "from_van" to define these three groups of people. From the result of average and median, we can conclude that visitors from outside BC spend the most per transaction.
+
+b. Query for the view:
+
+CREATE VIEW vancouver_custs AS
+WITH 
+  vprefixes (vp) AS 
+    (SELECT DISTINCT pcprefix FROM greater_vancouver_prefixes)
+SELECT c1.custid AS custid,
+      (CASE WHEN c1.pcode3 = v.vp THEN 1 ELSE 0 END) AS in_vancouver
+FROM ( (SELECT custid, city, SUBSTRING(postalcode, 1, 3) AS pcode3
+     	FROM customers) AS c1 
+     	LEFT OUTER JOIN vprefixes v
+     	ON c1.pcode3 = v.vp );
+
+
+c. Query for component a:
+
+SELECT (CASE WHEN (v1.in_vancouver = 0 AND c2.province = 'BC') THEN True ELSE False END) AS From_BC_non_Van,
+	(CASE WHEN v1.in_vancouver = 1 THEN True ELSE False END) AS From_Van,
+        COUNT(p.purchid) AS Count,
+        SUM(p.amount)/COUNT(p.purchid) AS Average,
+        MEDIAN(p.amount) AS Median
+FROM purchases p JOIN vancouver_custs v1
+    ON p.custid = v1.custid
+    JOIN customers c2
+    ON v1.custid = c2.custid
+GROUP BY (CASE WHEN (v1.in_vancouver = 0 AND c2.province = 'BC') THEN True ELSE False END), (CASE WHEN v1.in_vancouver = 1 THEN True ELSE False END)
+ORDER BY MEDIAN(p.amount) ASC;
+
+
+
+Question 3.
+
+a. Answer
+
+avg             in_vancouver
+85.8042               0
+77.5723               1
+
+From the result, tourists spend more at restaurants that serve sushi.
+
+
+b. Query:
+
+WITH sushi AS 
+(SELECT amenid
+FROM amenities
+WHERE tags.cuisine ILIKE '%sushi%' AND amenity = 'restaurant')
+
+SELECT SUM(p.amount)/COUNT(v4.custid) AS avg,
+       (CASE WHEN v4.in_vancouver = 1 THEN 1 ELSE 0 END) AS in_vancouver
+FROM (sushi s JOIN amenities a
+     ON s.amenid = a.amenid
+     JOIN purchases p
+     ON a.amenid = p.amenid
+     JOIN vancouver_custs v4
+     ON p.custid = v4.custid)
+GROUP BY (CASE WHEN v4.in_vancouver = 1 THEN 1 ELSE 0 END)
+ORDER BY (CASE WHEN v4.in_vancouver = 1 THEN 1 ELSE 0 END);
+
+
+
+Question 4.
+
+a. answer:
+
+pdate         avg
+2021-08-01    96.59
+2021-08-02    106.56
+2021-08-03    95.87
+2021-08-04    115.50
+2021-08-05    95.67
+
+The average number purchase per day for each of the first five days of August are as above.
+
+
+b. Query:
+
+SELECT pdate, AVG(amount) AS avg
+FROM purchases
+WHERE DATE_PART(mon, pdate) = 8 AND DATE_PART(d, pdate) IN (1,2,3,4,5)
+GROUP BY pdate
+ORDER BY DATE_PART(d, pdate) ASC;
+
+
+c. What was the bytes / record ratio for Redshift on the 5-day query?
+
+94.06/4703 * 1000 = 20 
+
+
+d. What was the bytes / record ratio for Spectrum on the 5-day query?
+
+267396/4703 = 56.856
+
+
+e. For this purchase dataset, the averages are 57 bytes/line and 968 lines/day. (It may be useful to explore the public-cmpt-732 bucket to derive these for yourself.) From these values, what might you infer about how Redshift scans the table? How Spectrum scans the table?
+
+Redshift scans only the parts of cells in each row required by the query in the table, which are the 'pdate' and 'amount' columns in this question, since the bytes/record ratio is only 20 bytes/row.
+
+Spectrum scans the whole file (which means it scans each line in the table fully), since the bytes / record ratio is about 56 KB/row, same as the original size.
+
+
+f. Based on these computations and the parallelism results, what properties of a dataset might make it well-suited to loading from S3 into Redshift before querying it?
+
+Since Redshift scans only what related to the query and charges based on cluster computation time, we prefer to use Redshift under these conditions:
+If the dataset is well-structured and has a schema, and our query only relates to a small number of columns. 
+If we need to use the dataset very often (for example, we need to query on the dataset every day), we prefer to use Redshift.
+
+
+g. Conversely, what properties of a dataset might make it well-suited to retaining in S3 and querying it using Spectrum?
+ 
+Since we are paying for the number of bytes read when using Spectrum, we prefer to use Spectrum under these conditions:
+If the dataset is not structured, or if the dataset is very large.
+If the computation is heavy and we need to execute sophisticated queries on the exabyte level dataset in a short period of time (because Spectrum allows for parallelism, and it manages the dataset on nodes concurrently). 
+If we need to do quite a lot of queries on the large dataset in a short period of time (not spread in a large time range). 
+
+
+
+
+
+
+
+
