@@ -1,4 +1,4 @@
-# CMPT732-Big-Data-Lab-Work
+# Big-Data-Lab-Work
 
 Personal work portfolio for CMPT732-Big Data Lab 1.
 
