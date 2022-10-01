@@ -1,6 +1,6 @@
-# Big Data Lab Work Portfolio
+# Big Data Work Portfolio
 
-This repo contains personal work portfolio for CMPT732-Big Data Lab 1. 
+This repo contains personal work portfolio about big data topic. 
 
 Mainly implementing data ETL to turn unstructured raw data into structured formats (csv, JSON, parquest, etc.), performing data analysis.
 
